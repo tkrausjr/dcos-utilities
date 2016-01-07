@@ -1,17 +1,12 @@
 #!/bin/bash
 #
-# BASH script to install DCOS on a node
+# BASH script to verify you are ready to install DCOS on a Node
 #
 # Usage:
 #
-#   dcos_install.sh <role>...
+#   sudo dcos_checks.sh
 #
 #
-# Metadata:
-#   dcos image commit: 934037ba2ca3347dab3965d3aff1c75c145b49a3
-#   generation date: 2016-01-06 22:03:10.576361
-#
-# TODO(cmaloney): Copyright + License string here
 
 set -o errexit -o nounset -o pipefail
 
@@ -42,7 +37,6 @@ if [[ $EUID -ne 0 ]]; then
     echo "This script must be run as root" 1>&2
     exit 1
 fi
-
 
 set +e
 
@@ -232,18 +226,6 @@ function check_all() {
     return $OVERALL_RC
 }
 
-function dcos_install()
-{
-    # Enable errexit
-    set -e
-
-    setup_directories
-    setup_dcos_roles
-    configure_dcos
-    setup_and_start_services
-
-}
-
 function usage()
 {
     echo -e "${BOLD}Usage: $0 [--disable-preflight|--preflight-only] <roles>${NORMAL}"
@@ -268,7 +250,6 @@ echo -e "${BOLD}Starting DCOS Prerequisite Checks${NORMAL}"
 echo -e "-------------------------------------------------"
 
 check_all
- 
 }
 
 # Run it all
