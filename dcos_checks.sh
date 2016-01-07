@@ -43,107 +43,6 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-function setup_directories() {
-    echo -e "Creating directories under /etc/mesosphere"
-    mkdir -p /etc/mesosphere/roles
-    mkdir -p /etc/mesosphere/setup-flags
-}
-
-function setup_dcos_roles() {
-    # Set DCOS roles
-    for role in $ROLES
-    do
-        echo "Creating role file for ${role}"
-        touch "/etc/mesosphere/roles/$role"
-    done
-}
-
-# Set DCOS machine configuration
-function configure_dcos() {
-echo -e 'Configuring DCOS'
-mkdir -p `dirname /etc/mesosphere/setup-flags/repository-url`
-cat <<'EOF' > "/etc/mesosphere/setup-flags/repository-url"
-http://192.168.100.234>
-
-EOF
-chmod 644 /etc/mesosphere/setup-flags/repository-url
-
-mkdir -p `dirname /etc/mesosphere/setup-flags/bootstrap-id`
-cat <<'EOF' > "/etc/mesosphere/setup-flags/bootstrap-id"
-BOOTSTRAP_ID=299269a7aa9e23a1edc94de3f2375356b2942af8
-
-EOF
-chmod 644 /etc/mesosphere/setup-flags/bootstrap-id
-
-mkdir -p `dirname /etc/mesosphere/setup-flags/cluster-packages.json`
-cat <<'EOF' > "/etc/mesosphere/setup-flags/cluster-packages.json"
-["dcos-config--setup_4ad1518260d1aeaabbe3246729a54533c849a95b", "dcos-detect-ip--setup_4ad1518260d1aeaabbe3246729a54533c849a95b", "dcos-metadata--setup_4ad1518260d1aeaabbe3246729a54533c849a95b", "onprem-config--setup_4ad1518260d1aeaabbe3246729a54533c849a95b"]
-EOF
-chmod 644 /etc/mesosphere/setup-flags/cluster-packages.json
-
-
-}
-
-# Install the DCOS services, start DCOS
-function setup_and_start_services() {
-echo -e 'Setting and starting DCOS'
-mkdir -p `dirname /etc/systemd/system/dcos-link-env.service`
-cat <<'EOF' > "/etc/systemd/system/dcos-link-env.service"
-[Unit]
-Before=dcos.target
-[Service]
-Type=oneshot
-StandardOutput=journal+console
-StandardError=journal+console
-ExecStartPre=/usr/bin/mkdir -p /etc/profile.d
-ExecStart=/usr/bin/ln -sf /opt/mesosphere/environment.export /etc/profile.d/dcos.sh
-
-EOF
-chmod 644 /etc/systemd/system/dcos-link-env.service
-
-mkdir -p `dirname /etc/systemd/system/dcos-download.service`
-cat <<'EOF' > "/etc/systemd/system/dcos-download.service"
-[Unit]
-Description=Download the DCOS
-After=network-online.target
-Wants=network-online.target
-ConditionPathExists=!/opt/mesosphere/
-[Service]
-EnvironmentFile=/etc/mesosphere/setup-flags/bootstrap-id
-Type=oneshot
-StandardOutput=journal+console
-StandardError=journal+console
-ExecStartPre=/usr/bin/curl --fail --retry 20 --continue-at - --location --silent --show-error --verbose --output /tmp/bootstrap.tar.xz http://192.168.100.234>/bootstrap/${BOOTSTRAP_ID}.bootstrap.tar.xz
-ExecStartPre=/usr/bin/mkdir -p /opt/mesosphere
-ExecStart=/usr/bin/tar -axf /tmp/bootstrap.tar.xz -C /opt/mesosphere
-ExecStartPost=-/usr/bin/rm -f /tmp/bootstrap.tar.xz
-
-EOF
-chmod 644 /etc/systemd/system/dcos-download.service
-
-mkdir -p `dirname /etc/systemd/system/dcos-setup.service`
-cat <<'EOF' > "/etc/systemd/system/dcos-setup.service"
-[Unit]
-Description=Prep the Pkgpanda working directories for this host.
-Requires=dcos-download.service
-After=dcos-download.service
-[Service]
-Type=oneshot
-StandardOutput=journal+console
-StandardError=journal+console
-EnvironmentFile=/opt/mesosphere/environment
-ExecStart=/opt/mesosphere/bin/pkgpanda setup --no-block-systemd
-[Install]
-WantedBy=multi-user.target
-EOF
-chmod 644 /etc/systemd/system/dcos-setup.service
-
-
-systemctl start dcos-link-env
-systemctl enable dcos-setup
-systemctl start dcos-setup
-
-}
 
 set +e
 
@@ -330,15 +229,6 @@ function check_all() {
       check_service $service
     done
 
-    for role in "$ROLES"
-    do
-        if [ "$role" != "master" -a "$role" != "slave" -a "$role" != "slave_public" ]; then
-            echo -e "${RED}FAIL Invalid role $role. Role must be one of {master,slave,slave_public}{NORMAL}"
-            (( OVERALL_RC += 1 ))
-        fi
-    done
-
-
     return $OVERALL_RC
 }
 
@@ -373,36 +263,12 @@ function main()
         esac
     done
 
-    if [[ $DISABLE_PREFLIGHT -eq 1 && $PREFLIGHT_ONLY -eq 1 ]]; then
-        echo -e 'Both --disable-preflight and --preflight-only can not be specified'
-        usage
-        exit 1
-    fi
+echo -e "Script running on machine - $HOSTNAME"
+echo -e "${BOLD}Starting DCOS Prerequisite Checks${NORMAL}"
+echo -e "-------------------------------------------------"
 
-    shift $(($OPTIND - 1))
-    ROLES=$@
-
-    if [[ $PREFLIGHT_ONLY -eq 1 ]] ; then
-        check_all
-    else
-        if [[ -z $ROLES ]] ; then
-            echo -e 'Atleast one role name must be specified'
-            usage
-            exit 1
-        fi
-        echo -e "${BOLD}Starting DCOS Install Process${NORMAL}"
-        if [[ $DISABLE_PREFLIGHT -eq 0 ]] ; then
-            check_all
-            RC=$?
-            if [[ $RC -ne 0 ]]; then
-                echo 'Preflight checks failed. Exiting installation. Please consult product documentation'
-                exit $RC
-            fi
-        fi
-        # Run actual install
-        dcos_install
-    fi
-
+check_all
+ 
 }
 
 # Run it all
