@@ -146,6 +146,20 @@ function check_all() {
     set +e
     echo -e "${BOLD}Running preflight checks${NORMAL}"
 
+    
+    # Check to see that the /var partition has enough space
+    varFree=$(df -h /var | tail -1 | awk '{print $4}')
+    varFreeInt=${varFree%.*}
+    if [ $varFreeInt -ge 5 ]; then
+        varFreeStatus="PASS"
+    else
+        varFreeStatus="FAIL"
+    fi
+
+    echo "/var has" $varFree "GB available" 
+    echo $varFreeStatus
+
+
     check_preexisting_dcos
 
     check_sort_capability
@@ -197,7 +211,7 @@ function check_all() {
         }
     ')
     # CoreOS stable as of Aug 2015 has 1.6.2
-    check docker 1.6 "$docker_version"
+    check docker 1.8 "$docker_version"
 
     check curl
     check bash
@@ -210,7 +224,7 @@ function check_all() {
     # systemd nnn
     # compiler option string
     # Pick up just the first line of output and get the version from it
-    check systemctl 200 $(systemctl --version | head -1 | cut -f2 -d' ') systemd
+    check systemctl 218 $(systemctl --version | head -1 | cut -f2 -d' ') systemd
 
     echo -e -n "Checking if group 'nogroup' exists: "
     getent group nogroup > /dev/null
