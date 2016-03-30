@@ -148,7 +148,7 @@ function check_all() {
 
     
     # Check to see that the /var partition has enough space
-    varFree=$(df -h /var | tail -1 | awk '{print $4}')
+    varFree=$(( $( df /var | tail -1 | awk '{print $4}')/1024/1024 ))
     varFreeInt=${varFree%.*}
     if [ $varFreeInt -ge 5 ]; then
         varFreeStatus="PASS"
