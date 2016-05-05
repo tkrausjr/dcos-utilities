@@ -1,0 +1,1 @@
+{"id": "140", "cpus": 0.1, "mem": 32, "cmd": "python -m http.server $PORT0", "instances": 1, "container": {"docker": {"image": "python:3"}}}
